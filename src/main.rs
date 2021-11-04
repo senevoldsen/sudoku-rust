@@ -1,6 +1,7 @@
 pub mod lib;
 
 use clap::{App, Arg};
+use std::time::Instant;
 
 use lib::{parse_grid, solve_recursive, solve_recursive_par};
 
@@ -34,11 +35,15 @@ fn main() -> Result<(), String> {
     }
     println!("Grid Input:\n{}", grid);
 
+    let start_time = Instant::now();
+
     let solved = if run_parallel {
         solve_recursive_par(grid)
     } else {
         solve_recursive(grid)
     };
+
+    println!("Time elapsed [ms]: {}", start_time.elapsed().as_millis());
 
     match solved {
         Some(solved_grid) => {
