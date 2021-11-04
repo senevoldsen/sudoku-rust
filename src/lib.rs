@@ -343,8 +343,7 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
     }
     // Try to fix any slot
     if let Some((cands, x, y)) = solve_state.candidate_fewest_choices() {
-        let cands_arr : Vec<CellValue> = cands.into_iter().collect();
-        let sub_results = cands_arr.par_iter().map(|&c| {
+        let sub_results = cands.into_iter().par_bridge().map(|c| {
             // Works and no deadlock?
             if let Some(branch) = solve_state.assign(c, x, y) {
                 if let Some(result_state) = solve_recursive_internal_par(branch) {
