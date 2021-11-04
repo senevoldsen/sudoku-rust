@@ -1,25 +1,27 @@
 mod lib;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 
-use lib::{solve_recursive, solve_recursive_par, parse_grid};
+use lib::{parse_grid, solve_recursive, solve_recursive_par};
 
 fn main() -> Result<(), String> {
-
     let matches = App::new("Sudoku solver")
         .version("0.1")
         .about("Solves Sudokus")
-        .arg(Arg::new("parallel")
-            .short('p')
-            .long("parallel")
-            .takes_value(false))
-        .arg(Arg::new("input_file")
-            .about("Sets the input source file")
-            .required(true)
-            .value_name("FILE")
-            .index(1))
+        .arg(
+            Arg::new("parallel")
+                .short('p')
+                .long("parallel")
+                .takes_value(false),
+        )
+        .arg(
+            Arg::new("input_file")
+                .about("Sets the input source file")
+                .required(true)
+                .value_name("FILE")
+                .index(1),
+        )
         .get_matches();
-    
     let filename: &str = matches.value_of("input_file").unwrap();
     let run_parallel = matches.is_present("parallel");
 
@@ -32,7 +34,6 @@ fn main() -> Result<(), String> {
     }
     println!("Grid Input:\n{}", grid);
 
-
     let solved = if run_parallel {
         solve_recursive_par(grid)
     } else {
@@ -42,7 +43,7 @@ fn main() -> Result<(), String> {
     match solved {
         Some(solved_grid) => {
             println!("One solution is\n{}", solved_grid);
-        },
+        }
         None => {
             println!("Unable to solve puzzle");
         }

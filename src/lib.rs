@@ -1,38 +1,38 @@
-use std::fmt::Error;
-use std::fmt::Formatter;
-use std::fmt::Display;
 use bitvec::mem::BitMemory;
 use bitvec::prelude::*;
 use rayon::prelude::*;
+use std::fmt::Display;
+use std::fmt::Error;
+use std::fmt::Formatter;
 
 // Cell values are only 0 (EMPTY) and 1..9 an assigned value.
 pub type CellValue = u8;
-pub const EMPTY_CELL : CellValue = 0;
-const NUM_CELLS : usize = 9*9;
+pub const EMPTY_CELL: CellValue = 0;
+const NUM_CELLS: usize = 9 * 9;
 // 4 bits are enough to represent 1..9 and EMPTY
-const NUM_BITS : usize = NUM_CELLS * 4;
+const NUM_BITS: usize = NUM_CELLS * 4;
 
 /// A 9x9 Grid for Sudoku compactly represented with 4 bits per cell
 /// Because we are compact we support [Copy] to allow easy splitting.
 #[derive(Debug, Copy, Clone)]
 pub struct Grid {
-    cells: BitArr!(for NUM_BITS, in Lsb0, CellValue)
+    cells: BitArr!(for NUM_BITS, in Lsb0, CellValue),
 }
 
 impl Grid {
     pub fn new<'a, T: BitMemory + Into<CellValue>>(values: &[T]) -> Grid {
         let mut cells = bitarr![Lsb0, CellValue; 0; NUM_BITS];
         for i in 0..NUM_CELLS {
-            let value : CellValue = values[i].into();
+            let value: CellValue = values[i].into();
             assert!(value >= 1 && value <= 9 || value == EMPTY_CELL);
             cells[Self::get_bit_range(i)].store(value);
         }
-        return Grid { cells }
+        return Grid { cells };
     }
 
     #[inline]
     fn get_bit_range(index: usize) -> std::ops::Range<usize> {
-        index*4..index*4+4
+        index * 4..index * 4 + 4
     }
 
     pub fn get(&self, x: usize, y: usize) -> CellValue {
@@ -40,7 +40,7 @@ impl Grid {
         bits.load()
     }
 
-    pub fn set(&mut self, val : CellValue, x : usize, y : usize) {
+    pub fn set(&mut self, val: CellValue, x: usize, y: usize) {
         let bits = &mut self.cells[Self::get_bit_range(get_index(x, y))];
         bits.store(val);
     }
@@ -79,7 +79,6 @@ impl Display for Grid {
     }
 }
 
-
 /// Represents a set of the values 1..9.
 #[derive(Clone, Copy, Debug)]
 pub struct ValueSet(u16);
@@ -96,14 +95,14 @@ impl ValueSet {
     /// You can call this with [EMPTY_CELL] which is true if the set is empty.
     pub fn contains(&self, value: CellValue) -> bool {
         if value == EMPTY_CELL {
-            return false
+            return false;
         }
         assert!(value >= 1 && value <= 9);
         (self.0 & (1 << (value - 1))) > 0
     }
 
     pub fn count(&self) -> u8 {
-        return self.0.count_ones() as u8
+        return self.0.count_ones() as u8;
     }
 
     pub fn get_first(&self) -> Option<u8> {
@@ -148,7 +147,7 @@ impl IntoIterator for ValueSet {
 }
 
 impl FromIterator<CellValue> for ValueSet {
-    fn from_iter<I: IntoIterator<Item=CellValue>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = CellValue>>(iter: I) -> Self {
         let mut value_set = ValueSet::empty();
         for c in iter {
             value_set.add(c);
@@ -159,12 +158,15 @@ impl FromIterator<CellValue> for ValueSet {
 
 pub struct ValueSetIterator {
     set: ValueSet,
-    next: usize
+    next: usize,
 }
 
 impl ValueSetIterator {
-    fn new(value_set : ValueSet) -> Self {
-        ValueSetIterator { set: value_set, next: 0 }
+    fn new(value_set: ValueSet) -> Self {
+        ValueSetIterator {
+            set: value_set,
+            next: 0,
+        }
     }
 }
 
@@ -175,7 +177,7 @@ impl Iterator for ValueSetIterator {
         while self.next <= 9 {
             self.next = self.next + 1;
             if self.set.contains((self.next - 1) as u8) {
-                return Some((self.next - 1) as u8)
+                return Some((self.next - 1) as u8);
             }
         }
         None
@@ -199,7 +201,8 @@ impl SolveState {
             candidates[i] = get_candidates(&grid, i % 9, i / 9);
         }
         SolveState {
-            grid, candidates: candidates
+            grid,
+            candidates: candidates,
         }
     }
 
@@ -230,7 +233,7 @@ impl SolveState {
         cpy.candidates[get_index(x, y)].clear();
         cpy.remove_val_from_peers(val, x, y);
         if self.deadlocked() {
-            return None
+            return None;
         } else {
             return Some(cpy);
         }
@@ -245,13 +248,12 @@ impl SolveState {
         for cy in 0..9 {
             self.cand_at_mut(x, cy).remove(val);
         }
-    
         // Constrain Quadrant
         {
             let sx = (x / 3) * 3;
             let sy = (y / 3) * 3;
-            for cy in sy..sy+3 {
-                for cx in sx..sx+3 {
+            for cy in sy..sy + 3 {
+                for cx in sx..sx + 3 {
                     self.cand_at_mut(cx, cy).remove(val);
                 }
             }
@@ -259,7 +261,6 @@ impl SolveState {
     }
 
     fn is_solved(&self) -> bool {
-        // NOTE: fragile since we access directly.
         for y in 0..9 {
             for x in 0..9 {
                 if self.grid.get(x, y) == EMPTY_CELL {
@@ -272,7 +273,7 @@ impl SolveState {
 
     fn candidate_fewest_choices(&self) -> Option<(ValueSet, usize, usize)> {
         let mut lowest_count = 99;
-        let mut best_i : usize = usize::MAX;
+        let mut best_i: usize = usize::MAX;
         for i in 0..NUM_CELLS {
             let candidate = self.candidates[i];
             let count = candidate.count();
@@ -309,8 +310,8 @@ pub fn get_candidates(grid: &Grid, x: usize, y: usize) -> ValueSet {
     {
         let sx = (x / 3) * 3;
         let sy = (y / 3) * 3;
-        for cy in sy..sy+3 {
-            for cx in sx..sx+3 {
+        for cy in sy..sy + 3 {
+            for cx in sx..sx + 3 {
                 candidates.remove(grid.get(cx, cy));
             }
         }
@@ -352,7 +353,7 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
             }
             None
         });
-        return sub_results.find_first(|&st| !st.is_none())?
+        return sub_results.find_first(|&st| !st.is_none())?;
     }
     return None;
 }
@@ -370,8 +371,9 @@ fn is_number(c: char) -> bool {
 }
 
 pub fn parse_grid(text: &str) -> Option<Grid> {
-    let nums : Vec<u8> = text.chars().
-        filter(|c| is_number(*c) || *c == '.')
+    let nums: Vec<u8> = text
+        .chars()
+        .filter(|&c| is_number(c) || c == '.')
         .map(|c| if c == '.' { 0 } else { c.to_digit(10).unwrap() } as u8)
         .collect();
     if nums.len() == NUM_CELLS {
@@ -380,13 +382,12 @@ pub fn parse_grid(text: &str) -> Option<Grid> {
     None
 }
 
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::collections::HashSet;
     use std::hash::Hash;
-    use super::*;
-
+    #[rustfmt::skip]
     pub const TEST_GRID: &str = "
     4 . . |. . . |8 . 5 
     . 3 . |. . . |. . . 
@@ -402,10 +403,11 @@ mod tests {
 ";
 
     fn contains_same_unordered<T, I1, I2>(a: I1, b: I2) -> bool
-    where 
-        I1: IntoIterator<Item=T>,
-        I2: IntoIterator<Item=T>,
-        T: Eq + Hash, {
+    where
+        I1: IntoIterator<Item = T>,
+        I2: IntoIterator<Item = T>,
+        T: Eq + Hash,
+    {
         let a: HashSet<T> = a.into_iter().collect();
         let b: HashSet<T> = b.into_iter().collect();
         a == b
@@ -414,9 +416,18 @@ mod tests {
     #[test]
     fn candidates() {
         let grid = parse_grid(TEST_GRID).unwrap();
-        assert!(contains_same_unordered(get_candidates(&grid, 3, 1), [1, 4, 5, 8, 9]));
-        assert!(contains_same_unordered(get_candidates(&grid, 0, 1), [2, 6, 7, 8, 9]));
-        assert!(contains_same_unordered(get_candidates(&grid, 5, 7), [1, 4, 7, 8, 9]));
+        assert!(contains_same_unordered(
+            get_candidates(&grid, 3, 1),
+            [1, 4, 5, 8, 9]
+        ));
+        assert!(contains_same_unordered(
+            get_candidates(&grid, 0, 1),
+            [2, 6, 7, 8, 9]
+        ));
+        assert!(contains_same_unordered(
+            get_candidates(&grid, 5, 7),
+            [1, 4, 7, 8, 9]
+        ));
     }
 
     #[test]
@@ -424,5 +435,4 @@ mod tests {
         let grid = parse_grid(TEST_GRID).unwrap();
         assert!(solve_recursive(grid).is_some());
     }
-    
 }
