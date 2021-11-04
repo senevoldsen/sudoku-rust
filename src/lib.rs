@@ -51,7 +51,7 @@ impl Grid {
 
 #[inline]
 fn get_index(x: usize, y: usize) -> usize {
-    assert!(x < 9 && y < 9);
+    debug_assert!(x < 9 && y < 9);
     y * 9 + x
 }
 
@@ -100,7 +100,7 @@ impl ValueSet {
         if value == EMPTY_CELL {
             return false;
         }
-        assert!(value >= 1 && value <= 9);
+        debug_assert!(value >= 1 && value <= 9);
         (self.0 & (1 << (value - 1))) > 0
     }
 
@@ -123,7 +123,7 @@ impl ValueSet {
         if value == EMPTY_CELL {
             return;
         }
-        assert!(value >= 1 && value <= 9);
+        debug_assert!(value >= 1 && value <= 9);
 
         self.0 |= 1 << (value - 1);
     }
@@ -132,7 +132,7 @@ impl ValueSet {
         if value == EMPTY_CELL {
             return;
         }
-        assert!(value >= 1 && value <= 9);
+        debug_assert!(value >= 1 && value <= 9);
         self.0 &= !(1 << (value - 1));
     }
 
@@ -288,10 +288,15 @@ impl SolveState {
             None
         }
     }
+ 
+    #[inline]
+    fn get_candidate(&self) -> Option<(ValueSet, usize, usize)> {
+        self.candidate_fewest_choices()
+    }
 }
 
 pub fn get_candidates(grid: &Grid, x: usize, y: usize) -> ValueSet {
-    assert!(x < 9 && y < 9);
+    debug_assert!(x < 9 && y < 9);
     let mut candidates = ValueSet::full();
 
     if grid.get(x, y) != EMPTY_CELL {
@@ -325,7 +330,7 @@ fn solve_recursive_internal(solve_state: SolveState) -> Option<SolveState> {
         return Some(solve_state);
     }
     // Try to fix any slot
-    if let Some((cands, x, y)) = solve_state.candidate_fewest_choices() {
+    if let Some((cands, x, y)) = solve_state.get_candidate() {
         for cand in cands {
             // Works and no deadlock?
             if let Some(branch) = solve_state.assign(cand, x, y) {
@@ -343,7 +348,7 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
         return Some(solve_state);
     }
     // Try to fix any slot
-    if let Some((cands, x, y)) = solve_state.candidate_fewest_choices() {
+    if let Some((cands, x, y)) = solve_state.get_candidate() {
         // For some reason this is quite a lot slower.
         // let sub_results = cands.into_iter().par_bridge().map(|c| {
 
