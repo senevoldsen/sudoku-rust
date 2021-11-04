@@ -1,4 +1,4 @@
-mod lib;
+pub mod lib;
 
 use clap::{App, Arg};
 

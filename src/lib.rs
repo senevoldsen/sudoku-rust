@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_range_contains)]
+
 use bitvec::mem::BitMemory;
 use bitvec::prelude::*;
 use rayon::prelude::*;
@@ -20,14 +23,14 @@ pub struct Grid {
 }
 
 impl Grid {
-    pub fn new<'a, T: BitMemory + Into<CellValue>>(values: &[T]) -> Grid {
+    pub fn new<T: BitMemory + Into<CellValue>>(values: &[T]) -> Grid {
         let mut cells = bitarr![Lsb0, CellValue; 0; NUM_BITS];
         for i in 0..NUM_CELLS {
             let value: CellValue = values[i].into();
             assert!(value >= 1 && value <= 9 || value == EMPTY_CELL);
             cells[Self::get_bit_range(i)].store(value);
         }
-        return Grid { cells };
+        Grid { cells }
     }
 
     #[inline]
@@ -56,7 +59,7 @@ impl Display for Grid {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         for y in 0..9 {
             if y % 3 == 0 {
-                write!(f, "+------+------+-----+\n")?
+                writeln!(f, "+------+------+-----+")?
             }
             for x in 0..9 {
                 if x % 3 == 0 {
@@ -72,9 +75,9 @@ impl Display for Grid {
                     write!(f, " ")?;
                 }
             }
-            write!(f, "|\n")?;
+            writeln!(f, "|")?;
         }
-        write!(f, "+------+------+-----+\n")?;
+        writeln!(f, "+------+------+-----+")?;
         Ok(())
     }
 }
@@ -102,7 +105,7 @@ impl ValueSet {
     }
 
     pub fn count(&self) -> u8 {
-        return self.0.count_ones() as u8;
+        self.0.count_ones() as u8
     }
 
     pub fn get_first(&self) -> Option<u8> {
@@ -175,7 +178,7 @@ impl Iterator for ValueSetIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.next <= 9 {
-            self.next = self.next + 1;
+            self.next += 1;
             if self.set.contains((self.next - 1) as u8) {
                 return Some((self.next - 1) as u8);
             }
@@ -202,7 +205,7 @@ impl SolveState {
         }
         SolveState {
             grid,
-            candidates: candidates,
+            candidates,
         }
     }
 
@@ -224,7 +227,7 @@ impl SolveState {
                 }
             }
         }
-        return false;
+        false
     }
 
     fn assign(&self, val: CellValue, x: usize, y: usize) -> Option<Self> {
@@ -233,9 +236,9 @@ impl SolveState {
         cpy.candidates[get_index(x, y)].clear();
         cpy.remove_val_from_peers(val, x, y);
         if self.deadlocked() {
-            return None;
+            None
         } else {
-            return Some(cpy);
+            Some(cpy)
         }
     }
 
@@ -268,7 +271,7 @@ impl SolveState {
                 }
             }
         }
-        return true;
+        true
     }
 
     fn candidate_fewest_choices(&self) -> Option<(ValueSet, usize, usize)> {
@@ -335,7 +338,7 @@ fn solve_recursive_internal(solve_state: SolveState) -> Option<SolveState> {
             }
         }
     }
-    return None;
+    None
 }
 
 fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
@@ -353,9 +356,9 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
             }
             None
         });
-        return sub_results.find_first(|&st| !st.is_none())?;
+        return sub_results.find_first(|&st| st.is_some())?;
     }
-    return None;
+    None
 }
 
 pub fn solve_recursive(grid: Grid) -> Option<Grid> {
@@ -366,14 +369,14 @@ pub fn solve_recursive_par(grid: Grid) -> Option<Grid> {
     solve_recursive_internal_par(SolveState::new(grid)).map(|st| st.grid)
 }
 
-fn is_number(c: char) -> bool {
-    return '0' <= c && c <= '9';
+fn is_digit(c: char) -> bool {
+    '0' <= c && c <= '9'
 }
 
 pub fn parse_grid(text: &str) -> Option<Grid> {
     let nums: Vec<u8> = text
         .chars()
-        .filter(|&c| is_number(c) || c == '.')
+        .filter(|&c| is_digit(c) || c == '.')
         .map(|c| if c == '.' { 0 } else { c.to_digit(10).unwrap() } as u8)
         .collect();
     if nums.len() == NUM_CELLS {
