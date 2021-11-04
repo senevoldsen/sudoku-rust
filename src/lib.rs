@@ -203,10 +203,7 @@ impl SolveState {
         for i in 0..NUM_CELLS {
             candidates[i] = get_candidates(&grid, i % 9, i / 9);
         }
-        SolveState {
-            grid,
-            candidates,
-        }
+        SolveState { grid, candidates }
     }
 
     #[inline]
@@ -347,7 +344,11 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
     }
     // Try to fix any slot
     if let Some((cands, x, y)) = solve_state.candidate_fewest_choices() {
-        let sub_results = cands.into_iter().par_bridge().map(|c| {
+        // For some reason this is quite a lot slower.
+        // let sub_results = cands.into_iter().par_bridge().map(|c| {
+
+        let cands_arr: Vec<CellValue> = cands.into_iter().collect();
+        let sub_results = cands_arr.par_iter().map(|&c| {
             // Works and no deadlock?
             if let Some(branch) = solve_state.assign(c, x, y) {
                 if let Some(result_state) = solve_recursive_internal_par(branch) {
