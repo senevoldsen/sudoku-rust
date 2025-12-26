@@ -22,13 +22,24 @@ pub struct Grid {
 }
 
 impl Grid {
-    pub fn new<T: Copy + Into<CellValue>>(values: &[T]) -> Grid {
+    pub fn new<C>(values: C) -> Grid
+    where
+        C: IntoIterator,
+        C::Item: Into<CellValue>,
+    {
         let mut cells = bitarr![CellValue, Lsb0; 0; NUM_BITS];
-        for i in 0..NUM_CELLS {
-            let value: CellValue = values[i].into();
+        let mut count: usize = 0;
+        for x in values {
+            assert!(count < NUM_CELLS);
+            let value: CellValue = x.into();
             assert!(value >= 1 && value <= 9 || value == EMPTY_CELL);
-            cells[Self::get_bit_range(i)].store(value);
+            cells[Self::get_bit_range(count)].store(value);
+            count += 1;
         }
+        assert!(
+            count == NUM_CELLS,
+            "Incorrect number of values passed to Grid::new"
+        );
         Grid { cells }
     }
 
@@ -174,9 +185,7 @@ pub struct ValueSetIterator {
 
 impl ValueSetIterator {
     fn new(value_set: ValueSet) -> Self {
-        ValueSetIterator {
-            set: value_set,
-        }
+        ValueSetIterator { set: value_set }
     }
 }
 
@@ -393,7 +402,7 @@ pub fn parse_grid(text: &str) -> Option<Grid> {
         .map(|c| if c == '.' { 0 } else { c.to_digit(10).unwrap() } as u8)
         .collect();
     if nums.len() == NUM_CELLS {
-        return Some(Grid::new(&nums));
+        return Some(Grid::new(nums));
     }
     None
 }
