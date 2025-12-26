@@ -1,12 +1,11 @@
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::manual_range_contains)]
 
-use bitvec::mem::BitMemory;
 use bitvec::prelude::*;
+use core::fmt::Display;
+use core::fmt::Error;
+use core::fmt::Formatter;
 use rayon::prelude::*;
-use std::fmt::Display;
-use std::fmt::Error;
-use std::fmt::Formatter;
 
 // Cell values are only 0 (EMPTY) and 1..9 an assigned value.
 pub type CellValue = u8;
@@ -19,12 +18,12 @@ const NUM_BITS: usize = NUM_CELLS * 4;
 /// Because we are compact we support [Copy] to allow easy splitting.
 #[derive(Debug, Copy, Clone)]
 pub struct Grid {
-    cells: BitArr!(for NUM_BITS, in Lsb0, CellValue),
+    cells: BitArr!(for NUM_BITS, in CellValue, Lsb0),
 }
 
 impl Grid {
-    pub fn new<T: BitMemory + Into<CellValue>>(values: &[T]) -> Grid {
-        let mut cells = bitarr![Lsb0, CellValue; 0; NUM_BITS];
+    pub fn new<T: Copy + Into<CellValue>>(values: &[T]) -> Grid {
+        let mut cells = bitarr![CellValue, Lsb0; 0; NUM_BITS];
         for i in 0..NUM_CELLS {
             let value: CellValue = values[i].into();
             assert!(value >= 1 && value <= 9 || value == EMPTY_CELL);
@@ -34,15 +33,17 @@ impl Grid {
     }
 
     #[inline]
-    fn get_bit_range(index: usize) -> std::ops::Range<usize> {
+    fn get_bit_range(index: usize) -> core::ops::Range<usize> {
         index * 4..index * 4 + 4
     }
 
+    #[inline]
     pub fn get(&self, x: usize, y: usize) -> CellValue {
         let bits = &self.cells[Self::get_bit_range(get_index(x, y))];
         bits.load()
     }
 
+    #[inline]
     pub fn set(&mut self, val: CellValue, x: usize, y: usize) {
         let bits = &mut self.cells[Self::get_bit_range(get_index(x, y))];
         bits.store(val);
@@ -87,15 +88,18 @@ impl Display for Grid {
 pub struct ValueSet(u16);
 
 impl ValueSet {
+    #[inline]
     pub fn empty() -> ValueSet {
         ValueSet(0)
     }
 
+    #[inline]
     pub fn full() -> ValueSet {
         ValueSet(0b1_1111_1111)
     }
 
     /// You can call this with [EMPTY_CELL] which is true if the set is empty.
+    #[inline]
     pub fn contains(&self, value: CellValue) -> bool {
         if value == EMPTY_CELL {
             return false;
@@ -104,10 +108,12 @@ impl ValueSet {
         (self.0 & (1 << (value - 1))) > 0
     }
 
+    #[inline]
     pub fn count(&self) -> u8 {
         self.0.count_ones() as u8
     }
 
+    #[inline]
     pub fn get_first(&self) -> Option<u8> {
         let trailing = self.0.trailing_zeros() as u8;
         // 0 trailing means 1'th bit is set implying we have 1
@@ -119,6 +125,7 @@ impl ValueSet {
         }
     }
 
+    #[inline]
     pub fn add(&mut self, value: CellValue) {
         if value == EMPTY_CELL {
             return;
@@ -128,6 +135,7 @@ impl ValueSet {
         self.0 |= 1 << (value - 1);
     }
 
+    #[inline]
     pub fn remove(&mut self, value: CellValue) {
         if value == EMPTY_CELL {
             return;
@@ -136,6 +144,7 @@ impl ValueSet {
         self.0 &= !(1 << (value - 1));
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.0 = 0;
     }
@@ -161,14 +170,12 @@ impl FromIterator<CellValue> for ValueSet {
 
 pub struct ValueSetIterator {
     set: ValueSet,
-    next: usize,
 }
 
 impl ValueSetIterator {
     fn new(value_set: ValueSet) -> Self {
         ValueSetIterator {
             set: value_set,
-            next: 0,
         }
     }
 }
@@ -176,14 +183,13 @@ impl ValueSetIterator {
 impl Iterator for ValueSetIterator {
     type Item = CellValue;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        while self.next <= 9 {
-            self.next += 1;
-            if self.set.contains((self.next - 1) as u8) {
-                return Some((self.next - 1) as u8);
-            }
+        let next = self.set.get_first();
+        if let Some(x) = next {
+            self.set.remove(x);
         }
-        None
+        next
     }
 }
 
@@ -288,7 +294,7 @@ impl SolveState {
             None
         }
     }
- 
+
     #[inline]
     fn get_candidate(&self) -> Option<(ValueSet, usize, usize)> {
         self.candidate_fewest_choices()
@@ -349,7 +355,7 @@ fn solve_recursive_internal_par(solve_state: SolveState) -> Option<SolveState> {
     }
     // Try to fix any slot
     if let Some((cands, x, y)) = solve_state.get_candidate() {
-        // For some reason this is quite a lot slower.
+        // For some reason this is quite a lot slower. (Still the case rayon 1.11.0)
         // let sub_results = cands.into_iter().par_bridge().map(|c| {
 
         let cands_arr: Vec<CellValue> = cands.into_iter().collect();
@@ -375,6 +381,7 @@ pub fn solve_recursive_par(grid: Grid) -> Option<Grid> {
     solve_recursive_internal_par(SolveState::new(grid)).map(|st| st.grid)
 }
 
+#[inline]
 fn is_digit(c: char) -> bool {
     '0' <= c && c <= '9'
 }
@@ -394,8 +401,8 @@ pub fn parse_grid(text: &str) -> Option<Grid> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::hash::Hash;
     use std::collections::HashSet;
-    use std::hash::Hash;
     #[rustfmt::skip]
     pub const TEST_GRID: &str = "
     4 . . |. . . |8 . 5 

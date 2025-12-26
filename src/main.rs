@@ -1,30 +1,28 @@
-pub mod lib;
-
-use clap::{App, Arg};
+use clap::{Arg, ArgAction, Command};
 use std::time::Instant;
 
-use lib::{parse_grid, solve_recursive, solve_recursive_par};
+use sudoku::{parse_grid, solve_recursive, solve_recursive_par};
 
 fn main() -> Result<(), String> {
-    let matches = App::new("Sudoku solver")
+    let matches = Command::new("Sudoku solver")
         .version("0.1")
         .about("Solves Sudokus")
         .arg(
             Arg::new("parallel")
                 .short('p')
                 .long("parallel")
-                .takes_value(false),
+                .action(ArgAction::SetTrue)
         )
         .arg(
             Arg::new("input_file")
-                .about("Sets the input source file")
+                .help("Sets the input source file")
                 .required(true)
                 .value_name("FILE")
-                .index(1),
+                .num_args(1)
         )
         .get_matches();
-    let filename: &str = matches.value_of("input_file").unwrap();
-    let run_parallel = matches.is_present("parallel");
+    let filename = matches.get_one::<String>("input_file").expect("required").as_str();
+    let run_parallel = matches.get_flag("parallel");
 
     // Load from file path
     let file_content = std::fs::read_to_string(filename).map_err(|e| e.to_string())?;
